@@ -1,0 +1,53 @@
+# Riippumaton katselmointiagentti jokaiseen PR:ään. Merkitse "agent-review" pakolliseksi haarasuojauksessa
+# vasta kun katselmointia on ajettu raportoivana pari viikkoa.
+# TODO: tarkista claude-code-actionin versio ja syötteet käyttöönottohetkellä.
+name: agent-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  agent-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Security review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Käytä security-reviewer-subagenttia (.claude/agents/security-reviewer.md).
+            Katselmoi tämän PR:n muutos sääntöjä vastaan, kirjoita review-result.json
+            ja kommentoi yhteenveto PR:ään. Älä muuta koodia.
+
+      - name: Enforce verdict
+        run: |
+          test -f review-result.json || { echo "Katselmointitulos puuttuu (SEC-009)"; exit 1; }
+          python3 - <<'EOF'
+          import json, sys
+          r = json.load(open("review-result.json"))
+          checked = [x for x in r.get("rules", []) if x.get("result") in ("pass", "fail", "n/a")]
+          print(f"Katselmointi arvioi {len(checked)} sääntöä")
+          if not checked:
+              sys.exit("Katselmointi ei arvioinut yhtään sääntöä (SEC-009)")
+          fails = [x for x in checked if x["result"] == "fail"]
+          for f in fails:
+              print(f"FAIL {f['id']}: {f.get('reason')} ({f.get('location', '')})")
+          sys.exit(1 if fails or r.get("verdict") != "pass" else 0)
+          EOF
+
+      - name: Upload review result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-review-${{ github.sha }}
+          path: review-result.json
+          retention-days: 90

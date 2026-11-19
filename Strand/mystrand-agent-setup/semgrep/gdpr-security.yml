@@ -1,0 +1,58 @@
+# Omat staattisen analyysin säännöt. Oletus: TypeScript/JavaScript. Sovita MyStrandin pinoon.
+# Jokaisen säännön id alkaa sääntörekisterin tunnisteella, jotta raportti linkittyy rules.yaml:iin.
+rules:
+  - id: GDPR-002-no-sensitive-in-logs
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: "GDPR-002: arkaluonteinen kenttä päätyy lokiin. Maskaa tai jätä pois."
+    patterns:
+      - pattern-either:
+          - pattern: console.$LOG(..., $X, ...)
+          - pattern: $LOGGER.$LEVEL(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $LEVEL
+          regex: (?i)^(log|info|warn|error|debug|trace)$
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(personal_?id|personalId|hetu|ssn|nie|id_?document|source_?of_?funds|pep).*
+
+  - id: GDPR-002-no-whole-contact-in-logs
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: "GDPR-002: koko henkilöolio lokissa. Lokita vain tunniste."
+    pattern-either:
+      - pattern: console.$LOG(..., $C.contact, ...)
+      - pattern: '$LOGGER.$LEVEL(..., { ..., contact: $C, ... }, ...)'
+
+  - id: GDPR-003-no-pii-in-url
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: "GDPR-003: henkilötieto URL-osoitteessa tai kyselyparametrissa."
+    patterns:
+      - pattern-inside: |
+          `...${$X}...`
+      - pattern: $X
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(email|phone|personal_?id|personalId|hetu|ssn).*
+
+  - id: SEC-004-sql-string-concat
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: "SEC-004: SQL-kysely merkkijonoja yhdistelemällä. Käytä parametreja."
+    pattern-either:
+      - pattern: $DB.query(`...${$X}...`, ...)
+      - pattern: $DB.query("..." + $X, ...)
+      - pattern: $DB.raw(`...${$X}...`, ...)
+
+  - id: SEC-003-route-without-authz
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: "SEC-003: reitti ilman näkyvää valtuutustarkistusta. Varmista oikeus kohteeseen."
+    patterns:
+      - pattern: $ROUTER.$METHOD($PATH, $HANDLER)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(get|post|put|patch|delete)$
+      # TODO: korvaa MyStrandin valtuutusmiddlewaren nimellä
+      - pattern-not: $ROUTER.$METHOD($PATH, requireAuth(...), ...)

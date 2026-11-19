@@ -1,0 +1,35 @@
+# MyStrand: uhkamalli (runko)
+
+Täydennetään ensimmäisessä tietoturvatyöpajassa. Katselmointiagentti lukee tämän tiedoston jokaisen PR:n yhteydessä.
+
+## Mitä suojataan
+
+| Kohde | Miksi | Luokka |
+| --- | --- | --- |
+| Asiakkaiden ja kuolinpesien henkilötiedot | GDPR, luottamus | pii, sensitive |
+| KYC-aineisto | Rahanpesulaki, viranomaisvalvonta | kyc |
+| Kauppojen ja tarjousten tiedot | Liikesalaisuus, asiakkaan etu | internal |
+| DIAS- ja maksuintegraatiot | Rahaliikenne, kaupan pätevyys | no-fly |
+| Välittäjien tunnukset ja oikeudet | Pääsy kaikkeen yllä olevaan | no-fly |
+
+## Keneltä
+
+- Ulkopuolinen hyökkääjä (tunnusten kalastelu, haavoittuvuudet riippuvuuksissa)
+- Toinen välittäjä tai asiakas, joka näkee tietoja, joihin hänellä ei ole oikeutta
+- Virheellinen tai liian laaja agentin muutos
+- Kolmannen osapuolen palvelu, jolle tietoja siirretään
+
+## Tärkeimmät riskit ja vastatoimet
+
+| Riski | Vastatoimi | Sääntö |
+| --- | --- | --- |
+| Asiakas tai välittäjä näkee toisen tiedot | Valtuutus jokaisessa reitissä, eristystestit | SEC-003 |
+| Henkilötiedot vuotavat lokeihin | Semgrep-säännöt, lokien maskaustesti | GDPR-002 |
+| Agentti muuttaa säänneltyä koodia | No-fly-hook, CODEOWNERS | SEC-006 |
+| Agentti löysää omia sääntöjään | Suojakaiteet suojattu | SEC-007 |
+| Haavoittuva riippuvuus | Dependency review | SEC-002 |
+
+## Avoimet kysymykset
+
+- TODO: mitkä kolmannet osapuolet saavat henkilötietoja (portaalit, DIAS, allekirjoituspalvelu, AI-palvelut)?
+- TODO: missä maissa tietoja käsitellään ja säilytetään?

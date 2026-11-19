@@ -1,0 +1,69 @@
+# Pakolliset tarkistukset jokaiseen PR:ään. Merkitse "security" pakolliseksi haarasuojauksessa.
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: pip install pyyaml semgrep
+
+      # SEC-009 ja rekisterin eheys: jokaisella säännöllä omistaja ja valvonta
+      - name: Policy check
+        run: python3 scripts/policy_check.py --matrix reports/compliance-matrix.md
+
+      # SEC-001
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # SEC-002
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      # SEC-003, SEC-004, GDPR-002, GDPR-003
+      - name: Semgrep (omat säännöt)
+        run: |
+          mkdir -p reports
+          semgrep scan --config semgrep/gdpr-security.yml --error --json --output reports/semgrep.json .
+
+      # GDPR-001. Pinon oma vaihe tuottaa build/schema-fields.txt (TODO MyStrandin pinoon).
+      - name: Data map check
+        run: |
+          mkdir -p build
+          # TODO: korvaa pinokohtaisella komennolla, esim. ORM-skeeman listaus
+          # npm run --silent list-schema-fields > build/schema-fields.txt
+          python3 scripts/check_data_map.py build/schema-fields.txt
+
+      # SEC-003, GDPR-002, GDPR-005, GDPR-006
+      - name: Security tests
+        run: 'echo "TODO: aja tietoturvatestit (authz-isolation, log-redaction, erasure, retention)"'
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.sha }}
+          path: reports/
+          retention-days: 90

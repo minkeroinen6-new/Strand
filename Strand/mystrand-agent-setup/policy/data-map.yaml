@@ -1,0 +1,42 @@
+# Henkilötietojen luokittelu kentittäin. scripts/check_data_map.py vertaa tätä skeemaan.
+# Luokat:
+#   public     julkinen tieto (esim. kohteen ilmoitusteksti)
+#   internal   ei henkilötietoa, mutta ei julkinen
+#   pii        tavallinen henkilötieto (nimi, puhelin, sähköposti)
+#   sensitive  arkaluonteinen tai suojattava (henkilötunnus, tulot, kuolinpesän tiedot)
+#   kyc        rahanpesulain mukainen tuntemisaineisto (henkilöllisyystodistus, PEP-, pakote- ja varojen alkuperätiedot)
+# Muutokset tähän tiedostoon vaativat tietosuojavastaavan hyväksynnän (CODEOWNERS, GDPR-007).
+# ESIMERKKEJÄ: korvataan MyStrandin todellisilla tauluilla ja kentillä.
+
+retention:
+  public: kohteen julkaisun ajan
+  internal: liiketoiminnan tarpeen mukaan
+  pii: asiakassuhteen ajan + 3 vuotta (TODO tietosuojavastaava vahvistaa)
+  sensitive: asiakassuhteen ajan + 3 vuotta (TODO tietosuojavastaava vahvistaa)
+  kyc: 5 vuotta asiakassuhteen päättymisestä (rahanpesulaki)
+
+fields:
+  contacts.id: {class: internal}
+  contacts.first_name: {class: pii, basis: sopimus}
+  contacts.last_name: {class: pii, basis: sopimus}
+  contacts.email: {class: pii, basis: sopimus}
+  contacts.phone: {class: pii, basis: sopimus}
+  contacts.personal_id: {class: sensitive, basis: lakisääteinen velvoite, note: henkilötunnus}
+  contacts.marketing_consent: {class: pii, basis: suostumus}
+
+  kyc_checks.id: {class: internal}
+  kyc_checks.contact_id: {class: internal}
+  kyc_checks.id_document: {class: kyc, basis: lakisääteinen velvoite}
+  kyc_checks.pep_status: {class: kyc, basis: lakisääteinen velvoite}
+  kyc_checks.sanctions_result: {class: kyc, basis: lakisääteinen velvoite}
+  kyc_checks.source_of_funds: {class: kyc, basis: lakisääteinen velvoite}
+
+  properties.id: {class: internal}
+  properties.address: {class: public}
+  properties.description: {class: public}
+  properties.asking_price: {class: public}
+  properties.owner_contact_id: {class: internal}
+
+  estates.id: {class: internal}
+  estates.deceased_name: {class: sensitive, basis: sopimus, note: kuolinpesä}
+  estates.shareholders: {class: sensitive, basis: sopimus}

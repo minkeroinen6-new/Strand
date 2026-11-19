@@ -1,0 +1,24 @@
+# Muutokset näihin polkuihin vaativat nimetyn ihmisen hyväksynnän (haarasuojauksessa "Require review from Code Owners").
+# Korvaa @-tunnisteet oikeilla GitHub-käyttäjillä tai tiimeillä. Agentin token ei saa kuulua näihin.
+
+# Suojakaiteet (SEC-007)
+/policy/rules.yaml        @strand/cto
+/policy/no-fly.yaml       @strand/cto
+/policy/threat-model.md   @strand/cto
+/.claude/                 @strand/cto
+/.github/                 @strand/cto
+/semgrep/                 @strand/cto
+/scripts/                 @strand/cto
+/CLAUDE.md                @strand/cto
+
+# Henkilötietojen luokittelu (GDPR-001, GDPR-007)
+/policy/data-map.yaml     @strand/dpo @strand/cto
+
+# No-fly-alueet (SEC-006)
+/src/kyc/                 @strand/senior-dev @strand/cto
+/src/dias/                @strand/senior-dev @strand/cto
+/src/payments/            @strand/senior-dev @strand/cto
+/src/auth/                @strand/senior-dev @strand/cto
+/src/permissions/         @strand/senior-dev @strand/cto
+/db/migrations/           @strand/senior-dev
+/infra/                   @strand/cto

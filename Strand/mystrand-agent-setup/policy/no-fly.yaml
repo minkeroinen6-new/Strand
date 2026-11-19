@@ -1,0 +1,34 @@
+# Polut, joihin kehittäjäagentti ei koske. .claude/hooks/guard_paths.py lukee tämän tiedoston.
+# Vastaavat polut ovat tiedostossa .github/CODEOWNERS, jotta myös ihmisten muutokset vaativat hyväksynnän.
+# Esimerkkipolut korvataan MyStrandin todellisilla poluilla. Kuvio: yksi glob per rivi listan alkiona.
+
+guardrails:
+  # Suojakaiteet itse (SEC-007). policy/data-map.yaml ei ole tässä: agentti lisää uudet kentät
+  # luokituksineen, ja CODEOWNERS vaatii muutokselle tietosuojavastaavan hyväksynnän (GDPR-007).
+  - policy/rules.yaml
+  - policy/no-fly.yaml
+  - policy/threat-model.md
+  - .claude/**
+  - .github/**
+  - semgrep/**
+  - scripts/policy_check.py
+  - scripts/check_data_map.py
+  - CLAUDE.md
+
+no_fly:
+  # Säännelty tai liiketoimintakriittinen koodi (SEC-006)
+  - src/kyc/**
+  - src/dias/**
+  - src/payments/**
+  - src/auth/**
+  - src/permissions/**
+  - db/migrations/**
+  - infra/**
+
+secrets:
+  # Tiedostot, joita agentti ei lue eikä muokkaa (SEC-001, SEC-005)
+  - .env
+  - .env.*
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/secrets/**"

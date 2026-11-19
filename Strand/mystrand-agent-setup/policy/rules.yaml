@@ -1,0 +1,112 @@
+# Sääntörekisteri. Jokaisella säännöllä on oltava omistaja ja vähintään yksi valvontamekanismi.
+# scripts/policy_check.py tarkistaa tämän tiedoston ja tuottaa vaatimusmatriisin jokaisesta julkaisusta.
+# Muutokset tähän tiedostoon vaativat ihmisen hyväksynnän (CODEOWNERS).
+
+version: 1
+owners:
+  cto: Ville Hjelt
+  dpo: TODO tietosuojavastaava
+  senior_dev: TODO seniorikehittäjä
+
+rules:
+  - id: SEC-001
+    rule: Koodissa, testeissä ja konfiguraatiossa ei ole salaisuuksia (avaimia, salasanoja, tokeneita)
+    owner: cto
+    enforced_by: [ci:gitleaks, github:push-protection, claude:deny-read-env]
+    evidence: security.yml / gitleaks-raportti
+
+  - id: SEC-002
+    rule: Uusissa riippuvuuksissa ei ole kriittisiä tai korkean vakavuuden tunnettuja haavoittuvuuksia
+    owner: cto
+    enforced_by: [ci:dependency-review]
+    evidence: security.yml / dependency-review
+
+  - id: SEC-003
+    rule: Jokainen API-reitti tarkistaa käyttäjän oikeuden juuri kyseiseen kohteeseen, asiakkaaseen tai kauppaan
+    owner: cto
+    enforced_by: [semgrep:route-without-authz, test:authz-isolation, review:security-reviewer]
+    evidence: semgrep-raportti, testiraportti, katselmointitulos
+
+  - id: SEC-004
+    rule: Tietokantakyselyt ovat parametrisoituja, ei merkkijonojen yhdistelyä
+    owner: cto
+    enforced_by: [semgrep:sql-string-concat]
+    evidence: semgrep-raportti
+
+  - id: SEC-005
+    rule: Kehittäjäagentilla ei ole pääsyä tuotannon tunnuksiin, tietokantaan eikä tuotantoympäristöön
+    owner: cto
+    enforced_by: [claude:deny-rules, claude:hook-guard-bash, ci:no-prod-secrets-in-agent-jobs]
+    evidence: .claude/settings.json, työnkulkujen salaisuuslista
+
+  - id: SEC-006
+    rule: Muutokset no-fly-alueilla (KYC, DIAS, maksut, tunnistautuminen, migraatiot) vaativat nimetyn ihmisen hyväksynnän
+    owner: cto
+    enforced_by: [claude:hook-guard-paths, github:codeowners, review:security-reviewer]
+    evidence: PR:n hyväksyntähistoria
+
+  - id: SEC-007
+    rule: Agentti ei muuta omia suojakaiteitaan (policy/, .claude/, .github/)
+    owner: cto
+    enforced_by: [claude:deny-rules, claude:hook-guard-paths, github:codeowners]
+    evidence: PR:n hyväksyntähistoria
+
+  - id: SEC-008
+    rule: Jokainen tuotantojulkaisu on jäljitettävä (SBOM, allekirjoitettu alkuperätieto, todistepaketti)
+    owner: cto
+    enforced_by: [ci:release-evidence]
+    evidence: release-evidence.yml / todistepaketti
+
+  - id: SEC-009
+    rule: Tarkistus, joka ei tutkinut yhtään kohdetta, epäonnistuu
+    owner: cto
+    enforced_by: [scripts:policy_check, scripts:check_data_map]
+    evidence: skriptien tulosteet (tutkittujen kohteiden määrä)
+
+  - id: SEC-010
+    rule: Tuotantoon viedään vain julkaisu, jonka tietoturvaskannaus testiympäristöä vastaan on ajettu
+    owner: cto
+    enforced_by: [ci:dast-staging]
+    evidence: "DAST-raportti (TODO: lisätään kun testiympäristö on käytössä)"
+
+  - id: GDPR-001
+    rule: Jokainen tallennettu kenttä on luokiteltu tiedostossa policy/data-map.yaml
+    owner: dpo
+    enforced_by: [scripts:check_data_map]
+    evidence: check_data_map-raportti
+
+  - id: GDPR-002
+    rule: Henkilötunnusta, KYC-aineistoa tai muita sensitive- ja kyc-luokan tietoja ei kirjoiteta lokeihin, virheilmoituksiin eikä analytiikkaan
+    owner: dpo
+    enforced_by: [semgrep:no-sensitive-in-logs, test:log-redaction, review:security-reviewer]
+    evidence: semgrep-raportti, testiraportti
+
+  - id: GDPR-003
+    rule: Henkilötietoja ei välitetä URL-osoitteissa tai kyselyparametreissa
+    owner: dpo
+    enforced_by: [semgrep:no-pii-in-url, review:security-reviewer]
+    evidence: semgrep-raportti
+
+  - id: GDPR-004
+    rule: Testeissä ja agentin ympäristössä käytetään vain synteettistä dataa
+    owner: dpo
+    enforced_by: [claude:deny-rules, review:security-reviewer]
+    evidence: katselmointitulos
+
+  - id: GDPR-005
+    rule: Poistopyyntö poistaa tai anonymisoi henkilön tiedot, ellei laki velvoita säilyttämään niitä
+    owner: dpo
+    enforced_by: [test:erasure]
+    evidence: testiraportti
+
+  - id: GDPR-006
+    rule: Säilytysajat noudattavat tietoluokitusta; KYC-aineisto säilytetään rahanpesulain mukaan viisi vuotta asiakassuhteen päättymisestä ja poistetaan sen jälkeen
+    owner: dpo
+    enforced_by: [test:retention]
+    evidence: testiraportti
+
+  - id: GDPR-007
+    rule: Uusi käyttötarkoitus, uusi tietoluokka tai uusi kolmas osapuoli, jolle tietoja siirretään, vaatii tietosuojavastaavan hyväksynnän
+    owner: dpo
+    enforced_by: [github:codeowners-data-map, review:security-reviewer]
+    evidence: PR:n hyväksyntähistoria
