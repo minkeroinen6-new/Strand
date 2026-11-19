@@ -1,5 +1,7 @@
 # Muutokset näihin polkuihin vaativat nimetyn ihmisen hyväksynnän (haarasuojauksessa "Require review from Code Owners").
-# Korvaa @-tunnisteet oikeilla GitHub-käyttäjillä tai tiimeillä. Agentin token ei saa kuulua näihin.
+# Korvaa @-tunnisteet oikeilla GitHub-käyttäjillä tai tiimeillä. Agenttien identiteetit (Claude Code, Linearin agentit)
+# eivät saa kuulua näihin ryhmiin (SEC-012). Tietoturvatarkistukset ja niiden säännöt ovat erillisessä
+# security-workflows-repossa, jota tämä repo ei voi muuttaa.
 
 # Suojakaiteet (SEC-007)
 /policy/rules.yaml        @strand/cto
@@ -7,8 +9,7 @@
 /policy/threat-model.md   @strand/cto
 /.claude/                 @strand/cto
 /.github/                 @strand/cto
-/semgrep/                 @strand/cto
-/scripts/                 @strand/cto
+/AGENTS.md                @strand/cto
 /CLAUDE.md                @strand/cto
 
 # Henkilötietojen luokittelu (GDPR-001, GDPR-007)

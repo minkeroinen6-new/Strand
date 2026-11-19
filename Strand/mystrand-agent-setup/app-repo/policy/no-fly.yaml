@@ -10,9 +10,7 @@ guardrails:
   - policy/threat-model.md
   - .claude/**
   - .github/**
-  - semgrep/**
-  - scripts/policy_check.py
-  - scripts/check_data_map.py
+  - AGENTS.md
   - CLAUDE.md
 
 no_fly:

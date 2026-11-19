@@ -1,0 +1,108 @@
+# Julkaisu ja todistusaineisto (SEC-008). Ajetaan, kun julkaisu tagataan.
+# 1) build: rakentaa julkaisun, tuottaa SBOM:n ja allekirjoitetun alkuperätiedon ja kokoaa todistepaketin.
+# 2) deploy: vie tuotantoon VAIN artefaktin, jonka alkuperä tarkistetaan tämän repon CI:stä.
+#    Tuotantoympäristö (GitHub Environment "production") vaatii ihmisen hyväksynnän, kun julkaisu koskee no-fly-alueita.
+name: release-deploy
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout security workflows
+        uses: actions/checkout@v4
+        with:
+          repository: strand/security-workflows   # TODO: oikea organisaatio ja repo
+          path: .security
+          token: ${{ secrets.SECURITY_REPO_READ_TOKEN }}   # tarvitaan, jos repo on yksityinen
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - name: Compliance matrix
+        run: python3 .security/scripts/policy_check.py --rules policy/rules.yaml --matrix evidence/compliance-matrix.md
+
+      - name: SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          output-file: evidence/sbom.spdx.json
+
+      - name: Build
+        run: 'echo "TODO: MyStrandin build, tuotos kansioon dist/"'
+
+      - name: Provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/**"
+
+      - name: Release manifest
+        run: |
+          {
+            echo "release: ${GITHUB_REF_NAME}"
+            echo "commit: ${GITHUB_SHA}"
+            echo "built_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "workflow_run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "commits_since_previous:"
+            git log --format='  - %H %an %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)"..HEAD
+          } > evidence/manifest.yaml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.ref_name }}
+          path: dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.ref_name }}
+          path: evidence/
+          retention-days: 90
+
+      - name: Archive to immutable store
+        run: 'echo "TODO: vie evidence/ arkistoon, jossa on muutos- ja poistosuoja (esim. object lock)"'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.ref_name }}
+          path: dist/
+
+      # Tuotantoon ei mene artefakti, jota ei ole rakennettu ja allekirjoitettu tämän repon CI:ssä.
+      - name: Verify provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          count=0
+          for f in $(find dist -type f); do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY"
+            count=$((count+1))
+          done
+          echo "Verified $count artifacts"
+          test "$count" -gt 0 || { echo "Ei tarkistettavia artefakteja (SEC-009)"; exit 1; }
+
+      - name: Deploy
+        run: 'echo "TODO: MyStrandin deploy-komento"'

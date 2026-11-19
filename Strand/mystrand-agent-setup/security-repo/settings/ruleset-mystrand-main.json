@@ -1,0 +1,47 @@
+{
+  "name": "mystrand-main-protection",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["~DEFAULT_BRANCH"],
+      "exclude": []
+    },
+    "repository_name": {
+      "include": ["mystrand"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "require_code_owner_review": true,
+        "dismiss_stale_reviews_on_push": true,
+        "require_last_push_approval": true,
+        "required_review_thread_resolution": true
+      }
+    },
+    {
+      "type": "workflows",
+      "parameters": {
+        "workflows": [
+          {
+            "repository_id": 0,
+            "path": ".github/workflows/mystrand-security.yml",
+            "ref": "refs/heads/main"
+          },
+          {
+            "repository_id": 0,
+            "path": ".github/workflows/mystrand-agent-review.yml",
+            "ref": "refs/heads/main"
+          }
+        ]
+      }
+    }
+  ]
+}

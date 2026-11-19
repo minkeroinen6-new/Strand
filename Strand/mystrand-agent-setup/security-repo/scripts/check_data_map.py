@@ -5,6 +5,7 @@ Input: a text file with one `table.column` per line, produced by a stack-specifi
 (e.g. listing the ORM schema). Fails if any field is unclassified, a class is unknown,
 or no fields were checked at all.
 """
+import argparse
 import sys
 
 import yaml
@@ -13,16 +14,17 @@ CLASSES = {"public", "internal", "pii", "sensitive", "kyc"}
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("usage: check_data_map.py <schema-fields.txt>")
-        return 2
+    parser = argparse.ArgumentParser()
+    parser.add_argument("fields_file", help="schema fields, one table.column per line")
+    parser.add_argument("--data-map", default="policy/data-map.yaml")
+    args = parser.parse_args()
     try:
-        with open(sys.argv[1], encoding="utf-8") as f:
+        with open(args.fields_file, encoding="utf-8") as f:
             fields = [line.strip() for line in f if line.strip() and not line.startswith("#")]
     except OSError:
         fields = []
 
-    with open("policy/data-map.yaml", encoding="utf-8") as f:
+    with open(args.data_map, encoding="utf-8") as f:
         mapped = (yaml.safe_load(f) or {}).get("fields") or {}
 
     errors = []

@@ -1,0 +1,79 @@
+# Keskitetty tietoturvatyönkulku. Tämä tiedosto, Semgrep-säännöt ja tarkistusskriptit ovat tässä
+# lukitussa security-workflows-repossa, ja organisaation ruleset vaatii työnkulun läpimenon ennen
+# mergeä MyStrand-repon päähaaraan. MyStrandin PR ei voi muuttaa tai heikentää näitä tarkistuksia.
+name: mystrand-security
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      # Tarkistettava koodi: MyStrand-repon PR
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Tarkistukset ja säännöt: tämä lukittu repo
+      - name: Checkout security workflows
+        uses: actions/checkout@v4
+        with:
+          repository: strand/security-workflows   # TODO: oikea organisaatio ja repo
+          path: .security
+          token: ${{ secrets.SECURITY_REPO_READ_TOKEN }}   # tarvitaan, jos repo on yksityinen
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: pip install pyyaml semgrep
+
+      # SEC-009 ja sääntörekisterin eheys
+      - name: Policy check
+        run: python3 .security/scripts/policy_check.py --rules policy/rules.yaml --matrix reports/compliance-matrix.md
+
+      # SEC-001
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # SEC-002
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      # SEC-003, SEC-004, GDPR-002, GDPR-003
+      - name: Semgrep
+        run: |
+          mkdir -p reports
+          semgrep scan --config .security/semgrep/gdpr-security.yml --error --metrics=off \
+            --exclude .security --json --output reports/semgrep.json .
+
+      # GDPR-001. MyStrand-repon pinokohtainen skripti tuottaa build/schema-fields.txt (TODO).
+      - name: Data map check
+        run: |
+          mkdir -p build
+          # TODO: npm run --silent list-schema-fields > build/schema-fields.txt
+          python3 .security/scripts/check_data_map.py build/schema-fields.txt --data-map policy/data-map.yaml
+
+      # SEC-003, GDPR-002, GDPR-005, GDPR-006
+      - name: Security tests
+        run: 'echo "TODO: aja tietoturvatestit (authz-isolation, log-redaction, erasure, retention)"'
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.sha }}
+          path: reports/
+          retention-days: 90

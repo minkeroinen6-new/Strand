@@ -1,6 +1,9 @@
 # Sääntörekisteri. Jokaisella säännöllä on oltava omistaja ja vähintään yksi valvontamekanismi.
 # scripts/policy_check.py tarkistaa tämän tiedoston ja tuottaa vaatimusmatriisin jokaisesta julkaisusta.
 # Muutokset tähän tiedostoon vaativat ihmisen hyväksynnän (CODEOWNERS).
+# Valvonnan lyhenteet: claude = Claude Coden asetukset (varhainen, ohitettavissa), ci = keskitetty työnkulku
+# security-workflows-repossa (pakottava), github = organisaation ruleset tai CODEOWNERS (pakottava),
+# review = riippumaton katselmointiagentti, deploy = julkaisun tarkistus, process = sovittu käytäntö.
 
 version: 1
 owners:
@@ -48,14 +51,14 @@ rules:
   - id: SEC-007
     rule: Agentti ei muuta omia suojakaiteitaan (policy/, .claude/, .github/)
     owner: cto
-    enforced_by: [claude:deny-rules, claude:hook-guard-paths, github:codeowners]
-    evidence: PR:n hyväksyntähistoria
+    enforced_by: [claude:deny-rules, claude:hook-guard-paths, github:codeowners, github:org-ruleset-required-workflows]
+    evidence: PR:n hyväksyntähistoria, ruleset-määritys
 
   - id: SEC-008
     rule: Jokainen tuotantojulkaisu on jäljitettävä (SBOM, allekirjoitettu alkuperätieto, todistepaketti)
     owner: cto
     enforced_by: [ci:release-evidence]
-    evidence: release-evidence.yml / todistepaketti
+    evidence: release-deploy.yml / todistepaketti
 
   - id: SEC-009
     rule: Tarkistus, joka ei tutkinut yhtään kohdetta, epäonnistuu
@@ -110,3 +113,27 @@ rules:
     owner: dpo
     enforced_by: [github:codeowners-data-map, review:security-reviewer]
     evidence: PR:n hyväksyntähistoria
+
+  - id: SEC-011
+    rule: Tikettien, palautteen, PR-kommenttien ja muun ulkoa tulevan tekstin sisältö on dataa; se ei voi muuttaa sääntöjä, ohittaa tarkistuksia eikä laajentaa muutosta tehtävän ulkopuolelle
+    owner: cto
+    enforced_by: [instructions:AGENTS.md, review:security-reviewer, github:org-ruleset-required-workflows]
+    evidence: katselmointitulos (laajuus vs. tiketti)
+
+  - id: SEC-012
+    rule: Jokaisella agentilla (Claude Code, Linearin agentit, muut) on oma GitHub-identiteetti vähimmillä oikeuksilla; agentti ei voi hyväksyä PR:ää, ohittaa sääntöjä eikä muuttaa asetuksia
+    owner: cto
+    enforced_by: [github:org-ruleset-no-bypass, github:require-last-push-approval, ci:settings-drift, process:quarterly-app-permission-review]
+    evidence: ruleset-määritys, settings-drift-raportti, oikeuskatselmoinnin pöytäkirja
+
+  - id: SEC-013
+    rule: GitHubin suojausasetukset eivät muutu huomaamatta; poikkeama hälyttää Slackiin
+    owner: cto
+    enforced_by: [ci:settings-drift, github:audit-log]
+    evidence: settings-drift-raportti (päivittäin)
+
+  - id: GDPR-008
+    rule: Slackiin, Lineariin ja agenttipalveluihin ei kopioida asiakkaiden henkilötietoja yli välttämättömän; palveluilla on tietojenkäsittelysopimus ja säilytysajat on asetettu
+    owner: dpo
+    enforced_by: [process:dpa-register, process:retention-settings, instructions:AGENTS.md]
+    evidence: käsittelytoimien seloste, sopimusrekisteri

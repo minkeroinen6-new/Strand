@@ -1,0 +1,44 @@
+# Valvoo päivittäin, ettei MyStrandin GitHub-suojauksia ole heikennetty (SEC-012, SEC-013).
+# Poikkeama kaataa ajon ja hälyttää Slackiin. Epäonnistunut ajo hälyttää myös itsessään,
+# joten valvonnan hiljeneminen ei jää huomaamatta.
+name: settings-drift
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub App, jolla on vain lukuoikeus organisaation ja repon hallinta-asetuksiin
+      - name: App token
+        id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.DRIFT_APP_ID }}
+          private-key: ${{ secrets.DRIFT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Check drift
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+          REPO: mystrand   # TODO: MyStrand-repon nimi
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK }}
+        run: python3 scripts/check_drift.py
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK }}
+        run: |
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"settings-drift epäonnistui: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}" \
+            "$SLACK_WEBHOOK_URL"

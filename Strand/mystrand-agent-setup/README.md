@@ -1,54 +1,61 @@
 # MyStrand: agenttisen kehityksen suojakaiteet (pohja)
 
-Ehdotus MyStrandin koodirepoon. Kansion sisältö kopioidaan sellaisenaan MyStrand-repon juureen. Pohja on tehty 19.11.2026 tueksi keskusteluun Ville Hjeltin kanssa, eikä sitä ole vielä sovitettu MyStrandin teknologiapinoon.
+Ehdotus MyStrandin agenttiseen kehitykseen, tehty 19.11.2026 tueksi keskusteluun Ville Hjeltin kanssa. Pohjaa ei ole vielä sovitettu MyStrandin teknologiapinoon.
 
 ## Periaate
 
-Agentille kirjoitettu ohje on toive, ei suojakaide. Jokainen sääntö kirjoitetaan kerran tiedostoon `policy/rules.yaml`, ja sen noudattaminen varmistetaan koneellisesti useassa kerroksessa, joita agentti ei voi itse ohittaa:
+Agentille kirjoitettu ohje on toive, ei suojakaide. Repoa muuttaa useampi työkalu (Claude Code, Linearin agentit, ihmiset omilla työkaluillaan), eikä niitä kaikkia voi pakottaa samoihin asetuksiin. Siksi takuu rakennetaan paikkaan, jonka kautta jokaisen muutoksen on pakko kulkea: GitHubiin ja julkaisuputkeen.
 
-| Kerros | Tiedosto | Pakottaako |
-| --- | --- | --- |
-| 1. Säännöt ja luokittelu | `policy/` | Lähde kaikelle muulle |
-| 2. Agentin ohjeet | `CLAUDE.md` | Ei, ohjaa |
-| 3. Agentin ajonaikaiset rajoitukset | `.claude/settings.json`, `.claude/hooks/` | Kyllä: estää lukemisen ja muokkaukset ennen kuin ne tapahtuvat |
-| 4. Repon portit | `.github/workflows/security.yml`, `semgrep/`, `scripts/` | Kyllä: pakolliset tarkistukset ennen mergeä |
-| 5. Riippumaton katselmointi | `.claude/agents/security-reviewer.md`, `.github/workflows/agent-review.yml` | Kyllä: hylkäys estää mergen |
-| 6. Ihmisen hyväksyntä | `.github/CODEOWNERS` | Kyllä: no-fly-alueet ja suojakaiteet itse |
-| 7. Julkaisu ja todisteet | `.github/workflows/release-evidence.yml` | Kyllä: julkaisusta jää todistusaineisto |
+| Taso | Missä | Voiko ohittaa | Rooli |
+| --- | --- | --- | --- |
+| 1. Työkalun sisällä | `AGENTS.md`, `CLAUDE.md`, `.claude/` | Kyllä | Pysäyttää virheet aikaisin ja halvalla |
+| 2. GitHub | Organisaation ruleset, keskitetyt työnkulut, CODEOWNERS | Ei | Varsinainen takuu: mikään ei pääse päähaaraan ilman näitä |
+| 3. Julkaisu | Tuotantoympäristö ja alkuperätarkistus | Ei | Tuotantoon menee vain CI:ssä rakennettu ja tarkistettu versio |
+| Valvonta | Päivittäinen asetusvalvonta | Ei | Hälyttää, jos tasoja 2–3 heikennetään |
 
-## Sisältö
+## Kaksi repoa
+
+**`app-repo/`** kopioidaan MyStrand-repon juureen. Se sisältää tuotteen omat säännöt ja agenttien ohjeet:
 
 ```
-CLAUDE.md                              agentin pysyvät ohjeet
-policy/rules.yaml                      sääntörekisteri: tunniste, omistaja, valvonta, todiste
+AGENTS.md                              ohjeet kaikille koodaaville agenteille
+CLAUDE.md                              tuo AGENTS.md:n ja lisää Claude Coden erityisohjeet
+policy/rules.yaml                      sääntörekisteri (21 sääntöä)
 policy/data-map.yaml                   henkilötietojen luokittelu kentittäin
 policy/no-fly.yaml                     polut, joihin agentti ei koske
 policy/threat-model.md                 uhkamallin runko
-.claude/settings.json                  oikeudet ja hookit
-.claude/hooks/guard_paths.py           estää no-fly- ja suojakaidetiedostojen muokkauksen
-.claude/hooks/guard_bash.py            estää vaaralliset komennot
-.claude/agents/security-reviewer.md    riippumaton tietoturva- ja tietosuojakatselmoija
+.claude/settings.json, .claude/hooks/  Claude Coden oikeudet ja estot
 .github/CODEOWNERS                     ihmisen hyväksyntä herkkiin polkuihin
-.github/workflows/security.yml         pakolliset tarkistukset jokaiseen PR:ään
-.github/workflows/agent-review.yml     katselmointiagentti jokaiseen PR:ään
-.github/workflows/release-evidence.yml julkaisun todistusaineisto
-semgrep/gdpr-security.yml              omat staattisen analyysin säännöt
-scripts/policy_check.py                tarkistaa sääntörekisterin ja tuottaa vaatimusmatriisin
-scripts/check_data_map.py              tarkistaa, että jokainen kenttä on luokiteltu
+.github/workflows/release-deploy.yml   julkaisu, todistepaketti ja alkuperätarkistus ennen deployta
+```
+
+**`security-repo/`** on oma, lukittu repo (esim. `strand/security-workflows`). MyStrandin PR ei voi muuttaa sen sisältöä, joten tarkistuksia ei voi heikentää muokkaamalla niitä samassa PR:ssä:
+
+```
+.github/workflows/mystrand-security.yml      pakolliset tarkistukset jokaiseen PR:ään
+.github/workflows/mystrand-agent-review.yml  riippumaton katselmointiagentti jokaiseen PR:ään
+.github/workflows/settings-drift.yml         päivittäinen asetusvalvonta ja Slack-hälytys
+reviewer/security-reviewer.md                katselmoijan ohjeet
+semgrep/gdpr-security.yml                    staattisen analyysin säännöt
+scripts/                                     policy_check, check_data_map, check_drift
+settings/ruleset-mystrand-main.json          organisaation ruleset koodina
 ```
 
 ## Käyttöönotto
 
-1. **Sovita polut.** Korvaa `policy/no-fly.yaml`:n ja `CODEOWNERS`:n esimerkkipolut (`src/kyc/**` jne.) MyStrandin todellisilla poluilla.
-2. **Täytä tietoluokittelu.** Käy `policy/data-map.yaml` läpi tietosuojavastaavan kanssa.
-3. **Lisää pinokohtainen kenttälistaus.** `scripts/check_data_map.py` lukee tiedoston `build/schema-fields.txt` (yksi `taulu.kenttä` per rivi). Sen tuottaa pinon oma skripti, esim. ORM-skeemasta.
-4. **Ota haarasuojaus käyttöön** `main`-haaraan: pakolliset tarkistukset `security` ja `agent-review`, CODEOWNERS-hyväksyntä, ei suoria pusheja, ei force pushia. Agentin GitHub-tokenilla ei saa olla ylläpitäjän oikeuksia.
-5. **Aseta salaisuudet:** `ANTHROPIC_API_KEY` sekä todistearkiston tunnukset. Agentin ympäristöön ei tuotannon tunnuksia.
-6. **Aloita varovasti.** Aja katselmointia ensin raportoivana kaksi viikkoa, säädä väärät hälytykset pois, ja tee siitä vasta sitten pakollinen.
+1. **Luo security-workflows-repo** organisaatioon. Vain CTO:lla on kirjoitusoikeus, eikä yksikään agentti saa oikeuksia siihen.
+2. **Ota organisaation ruleset käyttöön** tiedostosta `settings/ruleset-mystrand-main.json` GitHubin rajapinnan tai käyttöliittymän kautta. Korvaa `repository_id: 0` security-workflows-repon tunnisteella. Ohitusoikeuksien lista pidetään tyhjänä, myös ylläpitäjiltä.
+3. **Anna jokaiselle agentille oma GitHub-identiteetti** (Claude Coden GitHub-sovellus, Linearin agentin integraatio). Oikeus avata PR, mutta ei hyväksyä, ohittaa tai muuttaa asetuksia (SEC-012). Käy oikeudet läpi neljännesvuosittain.
+4. **Sovita polut ja pino:** `no-fly.yaml`, `CODEOWNERS`, Semgrep-säännöt (nyt TypeScript-oletus) ja pinokohtainen kenttälistaus tiedostoon `build/schema-fields.txt`.
+5. **Täytä tietoluokittelu** tietosuojavastaavan kanssa ja lisää Slack, Linear ja AI-palvelut käsittelytoimien selosteeseen (GDPR-008).
+6. **Aseta salaisuudet:** `ANTHROPIC_API_KEY`, `SECURITY_REPO_READ_TOKEN`, asetusvalvonnan GitHub-sovellus (`DRIFT_APP_ID`, `DRIFT_APP_PRIVATE_KEY`) ja `SLACK_SECURITY_WEBHOOK`.
+7. **Suojaa tuotantoympäristö:** GitHub Environment `production` ja vaadittu hyväksyjä no-fly-alueita koskeville julkaisuille.
+8. **Aloita varovasti:** aja katselmointia ensin raportoivana pari viikkoa ja tee siitä vasta sitten pakollinen rulesetissä.
 
 ## Avoimet kohdat (TODO)
 
-- MyStrandin teknologiapino: Semgrep-säännöt on kirjoitettu TypeScript/JavaScript-oletuksella.
-- Todistearkiston sijainti (esim. tallennussäilö, jossa tiedostoja ei voi muuttaa säilytysaikana).
-- Tietosuojavastaavan nimeäminen sääntöjen hyväksyjäksi.
-- `claude-code-action`-version ja syötteiden tarkistus käyttöönottohetkellä.
+- MyStrandin teknologiapino ja todelliset polut
+- Todistearkiston sijainti (tallennussäilö, jossa tiedostoja ei voi muuttaa säilytysaikana)
+- Tietosuojavastaavan nimeäminen
+- Tarkista käyttöönottohetkellä `claude-code-action`-version syötteet sekä rulesetin `workflows`- ja `pull_request`-sääntöjen parametrit GitHubin ajantasaisesta dokumentaatiosta
+- Mitkä Linearin agentit saavat kirjoittaa repoon, ja millä identiteetillä
